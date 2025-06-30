@@ -1,17 +1,59 @@
-use rinex::prelude::*;
-use std::{env, error, path::Path};
+use clap::Parser;
+use std::fs::File;
+use std::io::{BufReader, prelude::*};
+use std::path::PathBuf;
 
-const REQUIRED_NUMBER_OF_ARGS: usize = 2;
+/// Clear rinex file from bad epoches with non-0 epoch flag
+#[derive(clap::Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// The paths of input file
+    #[arg(short = 'i', long = "input", value_name = "PATH")]
+    input_file: PathBuf,
+    /// The path of output file
+    #[arg(short = 'o', long = "output", value_name = "PATH")]
+    output_file: PathBuf,
+}
 
-fn main() -> Result<(), Box<dyn error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    assert!(&args.len() > &REQUIRED_NUMBER_OF_ARGS, "input and output file path is required!");
-    let input_file = &args[1];
-    let output_file = &args[2];
-    println!("Start to rebuild rinex {}", input_file);
-    let rinex = Rinex::from_file(input_file)?;
-    let path = Path::new(output_file);
-    rinex.to_file(path)?;
-    println!("Rinex rebuild into {} is done", output_file);
-    Ok(())
+fn main() {
+    let cli = Cli::parse();
+    let input_file = File::open(cli.input_file).unwrap();
+    let mut output_file = File::create(cli.output_file).unwrap();
+    let reader = BufReader::new(input_file);
+    let mut write = true;
+    let mut is_header = true;
+    let mut version: u8 = 0;
+    for line in reader.lines() {
+        let line_content = line.unwrap();
+        if line_content.contains("RINEX VERSION") {
+            version = line_content[..11].trim().parse::<f32>().unwrap() as u8;
+        }
+        if version == 3 {
+            if line_content.len() > 33 && line_content.starts_with(">") {
+                let epoch_flag = line_content[30..33].trim();
+                if epoch_flag == "0" {
+                    write = true;
+                } else {
+                    write = false;
+                }
+            }
+        } else if version == 2 {
+            if line_content.len() > 30 && !line_content[..2].trim().is_empty() {
+                let epoch_flag = line_content[27..30].trim();
+                if epoch_flag.len() == 1 {
+                    if epoch_flag == "0" {
+                        write = true;
+                    } else {
+                        write = false;
+                    }
+                }
+            }
+        }
+        if is_header || write {
+            writeln!(output_file, "{}", line_content).unwrap();
+        }
+        if line_content.contains("END OF HEADER") {
+            is_header = false;
+        }
+    }
 }
