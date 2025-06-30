@@ -3,11 +3,11 @@ use std::fs::File;
 use std::io::{BufReader, prelude::*};
 use std::path::PathBuf;
 
-/// Clear rinex file from bad epoches with non-0 epoch flag
+/// Clear rinex file from bad epoches or other events with non-0 epoch flag
 #[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// The paths of input file
+    /// The path of input file
     #[arg(short = 'i', long = "input", value_name = "PATH")]
     input_file: PathBuf,
     /// The path of output file
