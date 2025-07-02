@@ -23,37 +23,42 @@ fn main() {
     let mut write = true;
     let mut is_header = true;
     let mut version: u8 = 0;
+
     for line in reader.lines() {
         let line_content = line.unwrap();
-        if line_content.contains("RINEX VERSION") {
-            version = line_content[..11].trim().parse::<f32>().unwrap() as u8;
-        }
-        if version == 3 {
-            if line_content.len() > 33 && line_content.starts_with(">") {
-                let epoch_flag = line_content[30..33].trim();
-                if epoch_flag == "0" {
-                    write = true;
-                } else {
-                    write = false;
-                }
+        if is_header {
+            writeln!(output_file, "{}", line_content).unwrap();
+            if line_content.contains("RINEX VERSION") {
+                version = line_content[..11].trim().parse::<f32>().unwrap() as u8;
             }
-        } else if version == 2 {
-            if line_content.len() > 30 && !line_content[..2].trim().is_empty() {
-                let epoch_flag = line_content[27..30].trim();
-                if epoch_flag.len() == 1 {
+            if line_content.contains("END OF HEADER") {
+                is_header = false;
+            }
+        } else {
+            if version == 3 {
+                if line_content.chars().count() > 33 && line_content.starts_with(">") {
+                    let epoch_flag = line_content[30..33].trim();
                     if epoch_flag == "0" {
                         write = true;
                     } else {
                         write = false;
                     }
                 }
+            } else if version == 2 {
+                if line_content.chars().count() > 30 && !line_content[..2].trim().is_empty() {
+                    let epoch_flag = line_content[27..30].trim();
+                    if epoch_flag.len() == 1 {
+                        if epoch_flag == "0" {
+                            write = true;
+                        } else {
+                            write = false;
+                        }
+                    }
+                }
             }
-        }
-        if is_header || write {
-            writeln!(output_file, "{}", line_content).unwrap();
-        }
-        if line_content.contains("END OF HEADER") {
-            is_header = false;
+            if write {
+                writeln!(output_file, "{}", line_content).unwrap();
+            }
         }
     }
 }
